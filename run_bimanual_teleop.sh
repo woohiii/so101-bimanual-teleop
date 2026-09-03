@@ -22,8 +22,8 @@ cd /home/youngchan/lerobot
 env -u PYTHONPATH PATH="/home/youngchan/lerobot/.venv/bin:$PATH" .venv/bin/lerobot-teleoperate \
   --robot.type=bi_so_follower \
   --robot.id=follower \
-  --robot.left_arm_config.port=/dev/ttyACM0  --robot.left_arm_config.max_relative_target=5.0 \
-  --robot.right_arm_config.port=/dev/ttyACM3 --robot.right_arm_config.max_relative_target=5.0 \
+  --robot.left_arm_config.port=/dev/ttyACM0  --robot.left_arm_config.max_relative_target=10.0 \
+  --robot.right_arm_config.port=/dev/ttyACM3 --robot.right_arm_config.max_relative_target=10.0 \
   --teleop.type=bi_so_leader \
   --teleop.id=leader \
   --teleop.left_arm_config.port=/dev/ttyACM2 \

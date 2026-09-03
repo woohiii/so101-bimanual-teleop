@@ -72,10 +72,16 @@ leader and follower start out at different positions (e.g. right after connectin
 the follower snaps straight to the leader's position on the very first command —
 the classic way to grind a gearbox or stall a servo on real hardware.
 
-`run_bimanual_teleop.sh` sets `max_relative_target=5.0` (degrees, since these configs
-default to `use_degrees=True`) on both follower arms — same value LeRobot's own docs
-use for the Reachy2 arm. At the default 60 Hz loop rate that still allows fast,
-responsive teleop (~300°/s ceiling) while preventing an instant full-range jump.
+`run_bimanual_teleop.sh` sets `max_relative_target=10.0` (degrees, since these configs
+default to `use_degrees=True`) on both follower arms — started at `5.0` (LeRobot's own
+docs use that for the Reachy2 arm) and raised to `10.0` after real teleop felt
+noticeably laggy on fast moves: `5.0` capped joint speed at 60 Hz to ~300°/s, so a
+quick leader motion made the follower visibly "catch up" instead of tracking live.
+`10.0` (~600°/s cap) removed most of that perceived lag while still bounding a single
+step, so a stale reading or a big leader/follower gap still can't cause an instant
+full-range jump — just a faster-than-`5.0`, still-bounded one. If it's still too
+laggy, raise it further, but each increase trades some of that jump protection away;
+if it now overshoots/oscillates, come back down.
 The gripper already gets hardware overload/current-limit register writes from
 LeRobot's own `so_follower.configure()` — nothing to add there.
 

@@ -52,7 +52,7 @@ from lerobot.utils.utils import init_logging, move_cursor_up
 from lerobot.utils.visualization_utils import init_visualization, log_visualization_data, shutdown_visualization
 
 CALIB_DIR = Path("/home/youngchan/ROBOTICS_PROJECT/calibration")
-MAX_RELATIVE_TARGET = 5.0  # degrees per step at FPS - see README "Motor safety"
+MAX_RELATIVE_TARGET = 10.0  # degrees per step at FPS - see README "Motor safety"
 FPS = 60
 
 
