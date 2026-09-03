@@ -3,9 +3,10 @@
 # process. Cameras (depth + 2 wrist) are intentionally NOT attached here - see README
 # "Why 3 separate processes". Run this after starting the camera processes.
 #
-# Ports below match /home/youngchan/ROBOTICS_PROJECT/calibration/arms.json as of the
-# last calibration. USB re-enumeration can change /dev/ttyACM* on replug/reboot -
-# always check `ls -l /dev/ttyACM*` against arms.json before running.
+# Ports come from arms.json (vendored in this repo) so there's one source of truth -
+# USB re-enumeration can change /dev/ttyACM* on replug/reboot, so if teleop can't find
+# an arm, re-run calibration/arms.json's owning workflow and update that file, not this
+# script.
 #
 # Per-arm configs have no `.id` field - BiSOFollower/BiSOLeader derive each arm's
 # calibration id as `<top-level id>_left` / `<top-level id>_right`. Our existing
@@ -21,6 +22,9 @@ pkill -CONT -f "lerobot-teleoperate.*bi_so_follower" 2>/dev/null || true
 pkill -INT -f "lerobot-teleoperate.*bi_so_follower" 2>/dev/null || true
 sleep 1
 
+ARMS_JSON=/home/youngchan/so101-bimanual-teleop/arms.json
+port() { jq -r ".[] | select(.id==\"$1\") | .port" "$ARMS_JSON"; }
+
 # --display_data=true spawns the Rerun viewer via `rr.spawn()`, which shells out
 # to find a `rerun` binary on PATH (it does NOT look next to the running Python).
 # The venv does have one (.venv/bin/rerun) - it's just not on PATH when this
@@ -29,11 +33,11 @@ sleep 1
 env -u PYTHONPATH PATH="/home/youngchan/lerobot/.venv/bin:$PATH" .venv/bin/lerobot-teleoperate \
   --robot.type=bi_so_follower \
   --robot.id=follower \
-  --robot.left_arm_config.port=/dev/ttyACM0  --robot.left_arm_config.max_relative_target=10.0 \
-  --robot.right_arm_config.port=/dev/ttyACM3 --robot.right_arm_config.max_relative_target=10.0 \
+  --robot.left_arm_config.port="$(port follower_left)"  --robot.left_arm_config.max_relative_target=10.0 \
+  --robot.right_arm_config.port="$(port follower_right)" --robot.right_arm_config.max_relative_target=10.0 \
   --teleop.type=bi_so_leader \
   --teleop.id=leader \
-  --teleop.left_arm_config.port=/dev/ttyACM2 \
-  --teleop.right_arm_config.port=/dev/ttyACM1 \
+  --teleop.left_arm_config.port="$(port leader_left)" \
+  --teleop.right_arm_config.port="$(port leader_right)" \
   --display_data=true \
   "$@"

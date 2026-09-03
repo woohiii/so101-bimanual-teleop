@@ -9,12 +9,11 @@ CLI flags, nothing custom needed there.
 The Astra S depth can't take that path on this rig: attaching it as a
 `robot.cameras` entry would open it through OpenNI2 *in this same process*, and
 OpenNI2 + OpenCV VideoCapture in one process is confirmed (see
-~/ROBOTICS_PROJECT/calibration/camera_preview.py's docstring, py-spy-verified)
-to starve OpenNI2's USB event thread and hang native reads forever. So this
-script never touches OpenNI2 - it reads the depth array that the already-running
-`run_astra_depth_watchdog.sh` publishes to a file, exactly like
-`camera_preview.py` does for its own depth panel, and logs that into Rerun
-alongside everything else.
+camera_preview.py's docstring, py-spy-verified) to starve OpenNI2's USB event
+thread and hang native reads forever. So this script never touches OpenNI2 -
+it reads the depth array that the already-running `run_astra_depth_watchdog.sh`
+publishes to a file, exactly like `camera_preview.py` does for its own depth
+panel, and logs that into Rerun alongside everything else.
 
 This is a thin copy of lerobot's own `lerobot_teleoperate.teleop_loop` (same
 processors, same CycleTimer, same connect/disconnect) with one addition: the
@@ -24,8 +23,9 @@ panel) picks it up automatically.
 
 Prereqs:
   - ~/ROBOTICS_PROJECT/calibration/run_astra_depth_watchdog.sh already running
-    in its own terminal (owns the Astra S).
-  - arms.json / cameras.json ports and camera names up to date.
+    in its own terminal (owns the Astra S; see README for why that script isn't
+    vendored into this repo).
+  - arms.json / cameras.json (in this repo) ports and camera names up to date.
 
 Usage (from the lerobot venv):
     cd ~/lerobot && PATH="$PWD/.venv/bin:$PATH" .venv/bin/python \\
@@ -34,12 +34,10 @@ Usage (from the lerobot venv):
 
 import argparse
 import json
-import sys
 import time
 from pathlib import Path
 
-sys.path.insert(0, "/home/youngchan/lerobot/custom_scripts/vision_pick_place")
-from camera_utils import ASTRA_DEPTH_MM_PATH, PublishedDepthSource, find_camera_index  # noqa: E402
+from camera_utils import ASTRA_DEPTH_MM_PATH, PublishedDepthSource, find_camera_index
 
 from lerobot.cameras.opencv import OpenCVCameraConfig
 from lerobot.processor import make_default_processors
@@ -51,7 +49,7 @@ from lerobot.utils.cycle_timer import CycleTimer
 from lerobot.utils.utils import init_logging, move_cursor_up
 from lerobot.utils.visualization_utils import init_visualization, log_visualization_data, shutdown_visualization
 
-CALIB_DIR = Path("/home/youngchan/ROBOTICS_PROJECT/calibration")
+CALIB_DIR = Path(__file__).parent  # arms.json / cameras.json vendored alongside this script
 MAX_RELATIVE_TARGET = 10.0  # degrees per step at FPS - see README "Motor safety"
 FPS = 60
 
