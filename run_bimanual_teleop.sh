@@ -14,6 +14,13 @@
 set -euo pipefail
 cd /home/youngchan/lerobot
 
+# See run_bimanual_teleop_with_cameras.sh for why: a previous run left stopped
+# (Ctrl+Z, or terminal closed) instead of Ctrl+C'd keeps holding the serial
+# ports, and the new run then fails to connect. Clean that up first.
+pkill -CONT -f "lerobot-teleoperate.*bi_so_follower" 2>/dev/null || true
+pkill -INT -f "lerobot-teleoperate.*bi_so_follower" 2>/dev/null || true
+sleep 1
+
 # --display_data=true spawns the Rerun viewer via `rr.spawn()`, which shells out
 # to find a `rerun` binary on PATH (it does NOT look next to the running Python).
 # The venv does have one (.venv/bin/rerun) - it's just not on PATH when this
