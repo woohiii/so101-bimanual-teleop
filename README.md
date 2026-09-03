@@ -42,6 +42,26 @@ also known to wedge on its own even standalone, which is why a watchdog with a
 (`lerobot`'s uv venv ships headless opencv — `cv2.imshow` doesn't work there at all,
 which is another reason camera display has to live in `lerobot_song_venv`.)
 
+## Cameras inside the Rerun window (optional)
+
+`run_bimanual_teleop_with_cameras.py` gets the wrist cams + depth into the *same*
+Rerun window as the arm telemetry, without breaking the constraint above:
+
+- **Wrist cams** go through the normal `robot.cameras` path (plain `OpenCVCameraConfig`
+  per arm) — that's the same mechanism `lerobot-teleoperate` already supports via CLI
+  flags (see its own module docstring for a bimanual example). No OpenNI2 involved, so
+  no conflict running it in the teleop process.
+- **Astra depth** still never touches OpenNI2 in this process. The script reads the
+  array `run_astra_depth_watchdog.sh` already publishes to
+  `/tmp/vsp_astra_depth_mm.npy` (the exact same file `camera_preview.py` reads for its
+  own depth panel) and merges it into the observation dict before logging — Rerun's
+  own image-key logic turns any `HxWx1` array into a `DepthImage` panel automatically.
+
+The Astra watchdog (process #2 above) is still required — this script only *reads*
+what it publishes, it doesn't replace it. `camera_preview.py` (process #3) becomes
+optional at that point; keep it running too if you still want the plain `cv2.imshow`
+windows alongside Rerun.
+
 ## Motor safety
 
 The one setting that actually prevents motor damage here is `max_relative_target`
@@ -74,17 +94,25 @@ ls -l /dev/ttyACM*
 cat ~/ROBOTICS_PROJECT/calibration/arms.json
 ```
 
-Then, in 3 terminals, in this order:
+Then, in 2 terminals:
 
 ```bash
-# 1) Astra S depth watchdog (own process, own venv)
+# 1) Astra S depth watchdog (own process, own venv) - always required
 ~/ROBOTICS_PROJECT/calibration/run_astra_depth_watchdog.sh
 
-# 2) camera preview: depth + 2 wrist windows
-~/lerobot_song_venv/bin/python ~/ROBOTICS_PROJECT/calibration/camera_preview.py
+# 2) bimanual teleop + cameras inside the same Rerun window
+~/so101-bimanual-teleop/run_bimanual_teleop_with_cameras.sh
+```
 
-# 3) bimanual teleop
+Or, for separate `cv2.imshow` camera windows instead of Rerun-embedded ones, swap
+step 2 for the plain arms-only launcher plus `camera_preview.py` in its own terminal:
+
+```bash
+# 2) bimanual teleop, arms only
 ~/so101-bimanual-teleop/run_bimanual_teleop.sh
+
+# 3) camera preview: depth + 2 wrist windows
+~/lerobot_song_venv/bin/python ~/ROBOTICS_PROJECT/calibration/camera_preview.py
 ```
 
 Stop with Ctrl+C in each terminal (torque is released automatically on exit).
@@ -103,7 +131,9 @@ Stop with Ctrl+C in each terminal (torque is released automatically on exit).
    follower's position — the console should print `Relative goal position magnitude
    had to be clamped to be safe.` This confirms the clamp is actually active, not just
    configured.
-4. **Cameras:** the 3 `camera_preview.py` windows ("Astra S Depth", "Wrist 1",
-   "Wrist 2") should update live.
+4. **Cameras:** either the 3 `camera_preview.py` windows ("Astra S Depth", "Wrist 1",
+   "Wrist 2") update live, or — with `run_bimanual_teleop_with_cameras.sh` — the Rerun
+   window shows `left_wrist` / `right_wrist` / `astra_depth` panels alongside the
+   joint-position time series, all updating live.
 5. **Full teleop:** with all 3 processes running, move each leader joint (including
    both grippers) and confirm the matching follower joint tracks it.
