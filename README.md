@@ -3,35 +3,16 @@
 Bimanual (2 leader + 2 follower) SO-101 teleoperation with a live depth camera view,
 2 wrist camera views, and a motor-safety clamp. Built on top of
 [LeRobot](https://github.com/huggingface/lerobot) — no core LeRobot code was changed,
-this repo is just the glue: launcher scripts, config, and this runbook.
+this repo is just the glue: a launcher script + this runbook.
 
 ## Hardware
 
-- 2x SO-101 leader arm, 2x SO-101 follower arm, all pre-calibrated, ids
-  `leader_left` / `leader_right` / `follower_left` / `follower_right`
-  (`arms.json`, vendored in this repo — see "Files in this repo").
+- 2x SO-101 leader arm, 2x SO-101 follower arm, all pre-calibrated
+  (calibration lives at `~/ROBOTICS_PROJECT/calibration/arms.json`, ids
+  `leader_left` / `leader_right` / `follower_left` / `follower_right`).
 - 1x Orbbec Astra S depth camera (OpenNI2/`primesense`).
-- 2x USB wrist cameras, identified by USB product name: "Innomaker", "USB 2.0 PC Cam"
-  (`cameras.json`, vendored in this repo).
-
-## Files in this repo
-
-Everything needed to run teleop lives here — `arms.json`, `cameras.json`,
-`camera_utils.py` (camera-index resolution + the published-depth-file reader) and
-`camera_preview.py` were copied in from `~/ROBOTICS_PROJECT` (also on GitHub, public,
-at [woohiii/-1](https://github.com/woohiii/-1)) because they're small, pure-Python,
-and have no binary dependency.
-
-**Not vendored, on purpose:** `run_astra_depth_watchdog.sh` and `astra_s_depth_hub.py`
-stay in `woohiii/-1` — they need the Orbbec OpenNI2 SDK, a large vendored binary
-redistribution tree living next to them there, and duplicating that into a second repo
-just to move two small scripts isn't worth it (YAGNI). This repo links to them by path
-instead of copying them.
-
-**Known duplication, accepted for now:** `arms.json`/`cameras.json` now exist in both
-repos. If you recalibrate an arm or a camera re-enumerates under a new name, update
-`woohiii/-1`'s copy (that's what `calibrate_arms.py` writes to) and re-copy it here —
-there's no sync automation, on purpose, for a 2-file config at this stage.
+- 2x USB wrist cameras (identified by USB product name: "Innomaker", "USB 2.0 PC Cam",
+  see `~/ROBOTICS_PROJECT/calibration/cameras.json`).
 
 ## Why Python
 
@@ -54,9 +35,9 @@ also known to wedge on its own even standalone, which is why a watchdog with a
 
 | # | venv | what | why |
 |---|------|------|-----|
-| 1 | `lerobot`'s `.venv` (uv) | this repo's `run_bimanual_teleop.sh` → `lerobot-teleoperate` | drives all 4 arms only, no cameras attached |
-| 2 | `~/lerobot_song_venv` (headless) | `woohiii/-1`'s `run_astra_depth_watchdog.sh` | owns the Astra S, publishes depth to `/tmp/vsp_astra_depth_mm.npy`, auto-recovers via USB reset |
-| 3 | `~/lerobot_song_venv` (GUI opencv) | this repo's `camera_preview.py` | reads the published depth file + opens both wrist cams directly, shows 3 live `cv2.imshow` windows |
+| 1 | `lerobot`'s `.venv` (uv) | `run_bimanual_teleop.sh` → `lerobot-teleoperate` | drives all 4 arms only, no cameras attached |
+| 2 | `~/lerobot_song_venv` (headless) | `run_astra_depth_watchdog.sh` | owns the Astra S, publishes depth to `/tmp/vsp_astra_depth_mm.npy`, auto-recovers via USB reset |
+| 3 | `~/lerobot_song_venv` (GUI opencv) | `camera_preview.py` | reads the published depth file + opens both wrist cams directly, shows 3 live `cv2.imshow` windows |
 
 (`lerobot`'s uv venv ships headless opencv — `cv2.imshow` doesn't work there at all,
 which is another reason camera display has to live in `lerobot_song_venv`.)
@@ -110,13 +91,13 @@ Check ports first — USB re-enumeration can shuffle `/dev/ttyACM*`:
 
 ```bash
 ls -l /dev/ttyACM*
-cat ~/so101-bimanual-teleop/arms.json
+cat ~/ROBOTICS_PROJECT/calibration/arms.json
 ```
 
 Then, in 2 terminals:
 
 ```bash
-# 1) Astra S depth watchdog (own process, own venv) - always required, lives in woohiii/-1
+# 1) Astra S depth watchdog (own process, own venv) - always required
 ~/ROBOTICS_PROJECT/calibration/run_astra_depth_watchdog.sh
 
 # 2) bimanual teleop + cameras inside the same Rerun window
@@ -131,7 +112,7 @@ step 2 for the plain arms-only launcher plus `camera_preview.py` in its own term
 ~/so101-bimanual-teleop/run_bimanual_teleop.sh
 
 # 3) camera preview: depth + 2 wrist windows
-~/lerobot_song_venv/bin/python ~/so101-bimanual-teleop/camera_preview.py
+~/lerobot_song_venv/bin/python ~/ROBOTICS_PROJECT/calibration/camera_preview.py
 ```
 
 Stop with Ctrl+C in each terminal (torque is released automatically on exit).
@@ -140,7 +121,7 @@ Stop with Ctrl+C in each terminal (torque is released automatically on exit).
 
 1. **Static checks (motors idle):**
    ```bash
-   ~/lerobot_song_venv/bin/python ~/so101-bimanual-teleop/camera_preview.py --self-test
+   ~/lerobot_song_venv/bin/python ~/ROBOTICS_PROJECT/calibration/camera_preview.py --self-test
    uv run --project ~/lerobot python ~/ROBOTICS_PROJECT/calibration/calibrate_arms.py --verify
    ```
    Expect all wrist cams to resolve and all 4 arms to report `PASS`.
