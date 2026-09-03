@@ -14,7 +14,12 @@
 set -euo pipefail
 cd /home/youngchan/lerobot
 
-env -u PYTHONPATH .venv/bin/lerobot-teleoperate \
+# --display_data=true spawns the Rerun viewer via `rr.spawn()`, which shells out
+# to find a `rerun` binary on PATH (it does NOT look next to the running Python).
+# The venv does have one (.venv/bin/rerun) - it's just not on PATH when this
+# script calls .venv/bin/lerobot-teleoperate directly instead of activating the
+# venv, so PATH needs it prepended here.
+env -u PYTHONPATH PATH="/home/youngchan/lerobot/.venv/bin:$PATH" .venv/bin/lerobot-teleoperate \
   --robot.type=bi_so_follower \
   --robot.id=follower \
   --robot.left_arm_config.port=/dev/ttyACM4  --robot.left_arm_config.max_relative_target=5.0 \
