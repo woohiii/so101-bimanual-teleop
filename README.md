@@ -15,7 +15,9 @@ this repo is just the glue: launcher scripts, config, and this runbook.
 - [2026-09-04](docs/2026-09-04-camera-stream-fix.html) — isolating the flaky Astra S RGB
   stream in its own background thread so a wedged color read can never stall the
   depth-publish loop the watchdog and recording depend on. GitHub's file viewer shows
-  this as raw source, not the rendered diagram — clone and open it locally to view.
+  this as raw source, not the rendered diagram — either clone and open it locally,
+  or view the rendered version at
+  [claude.ai/code/artifact/3b54d811-8625-4248-abb2-4ef94122167a](https://claude.ai/code/artifact/3b54d811-8625-4248-abb2-4ef94122167a).
 
 ## Hardware
 
