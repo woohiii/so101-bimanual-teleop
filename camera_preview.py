@@ -1,6 +1,7 @@
 #!/usr/bin/env python
-"""4-window live camera preview: Astra S depth + Astra S RGB (with two-arm
-towel grasp point guidance overlaid) + 2 USB wrist cameras.
+"""Live camera preview, one window split into a 2x2 grid: Astra S RGB (with
+two-arm towel grasp point guidance overlaid) + Astra S depth + 2 USB wrist
+cameras.
 
 IMPORTANT - run with the OTHER venv, NOT the lerobot uv venv:
     ~/lerobot_song_venv/bin/python camera_preview.py
@@ -109,6 +110,22 @@ def depth_to_display(depth_mm):
     return image
 
 
+PANEL_W, PANEL_H = 480, 360  # 4:3, matches both the wrist cams' and Astra's aspect ratio - plain resize, no distortion
+
+
+def _panel(frame, label):
+    """Resizes frame to a fixed panel size and labels it, or renders a
+    placeholder if frame is None (source not available this tick) - so a
+    missing feed doesn't collapse the grid layout."""
+    if frame is None:
+        img = np.zeros((PANEL_H, PANEL_W, 3), dtype=np.uint8)
+        cv2.putText(img, "NO SIGNAL", (PANEL_W // 2 - 95, PANEL_H // 2), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 2)
+    else:
+        img = cv2.resize(frame, (PANEL_W, PANEL_H))
+    cv2.putText(img, label, (10, 25), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
+    return img
+
+
 def open_wrist(name, label):
     idx = find_camera_index(name)
     if idx is None:
@@ -136,8 +153,7 @@ def run_preview(cameras):
 
             ok, rgb = rgb_source.read()
             grasp_points = detect_towel_grasp_points(rgb) if ok else None
-            if ok:
-                cv2.imshow("Astra S RGB (grasp points)", draw_grasp_points(rgb, grasp_points))
+            rgb_display = draw_grasp_points(rgb, grasp_points) if ok else None
 
             if grasp_points is not None and depth_vis is not None:
                 # ponytail: scales RGB-frame points onto depth's QVGA grid by
@@ -153,17 +169,22 @@ def run_preview(cameras):
                 scaled = type(grasp_points)(left=_scale(grasp_points.left), right=_scale(grasp_points.right))
                 depth_vis = draw_grasp_points(depth_vis, scaled)
 
-            if depth_vis is not None:
-                cv2.imshow("Astra S Depth", depth_vis)
-
+            wrist1_img = None
             if wrist1 is not None:
                 ok, img = wrist1.read()
-                if ok:
-                    cv2.imshow("Wrist 1", img)
+                wrist1_img = img if ok else None
+            wrist2_img = None
             if wrist2 is not None:
                 ok, img = wrist2.read()
-                if ok:
-                    cv2.imshow("Wrist 2", img)
+                wrist2_img = img if ok else None
+
+            grid = cv2.vconcat(
+                [
+                    cv2.hconcat([_panel(rgb_display, "Astra RGB (grasp points)"), _panel(depth_vis, "Astra Depth")]),
+                    cv2.hconcat([_panel(wrist1_img, "Wrist 1"), _panel(wrist2_img, "Wrist 2")]),
+                ]
+            )
+            cv2.imshow("Camera Preview", grid)
 
             if cv2.waitKey(1) & 0xFF == ord("q"):
                 break
