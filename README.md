@@ -145,6 +145,55 @@ runs the cleanup that releases torque and the camera/serial handles. Both launch
 scripts also auto-clean a stopped leftover from a previous sloppy exit before starting,
 but a clean Ctrl+C is still the better habit (see Troubleshooting).
 
+## Recording a dataset (with depth)
+
+`record_bimanual_with_depth.py` is `lerobot-record` plus the depth camera —
+reuses LeRobot's own `record_loop` (episode looping, keyboard control `→`/`←`/`ESC`,
+video encoding) unchanged, and instance-patches `BiSOFollower.get_observation()` to merge
+in the Astra depth array (read from the file `run_astra_depth_watchdog.sh` publishes, same
+mechanism as `run_bimanual_teleop_with_cameras.py`, for the same OpenNI2/OpenCV
+process-isolation reason). `observation_features` gets an extra `"astra_depth": (240, 320, 1)`
+entry so it's picked up as a real dataset feature — `(H, W, 1)` is LeRobotDataset's own
+"this is a depth map" convention (`hw_to_dataset_features` in `lerobot/utils/feature_utils.py`),
+which already has a dedicated depth video codec path (lossless 12-bit HEVC).
+
+```bash
+# prereq: run_astra_depth_watchdog.sh already running (see "Running it" above)
+cd ~/lerobot && uv run python ~/so101-bimanual-teleop/record_bimanual_with_depth.py \
+  --repo_id local/my_task \
+  --single_task "Describe the task in one sentence" \
+  --num_episodes 20 --episode_time_s 40 --reset_time_s 10
+```
+
+**Depth doesn't train out of the box — SmolVLA's vision encoder is RGB-only.**
+`observation.images.astra_depth` is a valid *dataset* feature, but SmolVLA's SigLIP-style
+vision encoder has a hardwired 3-channel patch-embedding conv — a 1-channel depth image
+crashes it (`expected input[...] to have 3 channels, but got 1`). This isn't a config flag
+fix. Two ways out, in the order we found them:
+
+1. **Drop it for that policy's training copy:**
+   `lerobot-edit-dataset --repo_id ... --operation.type remove_feature --operation.feature_names "['observation.images.astra_depth']"`
+   — keeps the original (with depth) around for later; the copy trains fine on the 2 wrist
+   cams alone.
+2. **Fold a downsampled depth summary into `observation.state` instead** (`depth_to_state_feature.py`):
+   the raw 240x320 depth map is 76,800 values/frame — too big and spatially unstructured for
+   a plain state MLP, so this block-averages it down to a 4x4 grid (16 values) and
+   concatenates that onto the existing joint-state vector. A *new*, separately-named state
+   feature would silently go unused — SmolVLA's `modeling_smolvla.py` only ever reads the one
+   hardcoded `observation.state` key — so this has to replace that key's contents, not add a
+   sibling. Decodes depth **per episode** (one sequential `decode_video_frames` call per
+   episode) rather than per frame — `LeRobotDataset.__getitem__` reopens and reseeks the video
+   container on *every* call (see `dataset_reader.py`'s `_query_videos`), which is fine for
+   training's shuffled random access but is a reopen-per-frame anti-pattern for a full
+   sequential sweep; a naive `dataset[i]` loop over ~20k frames got progressively slower as it
+   went instead of finishing in minutes.
+   ```bash
+   cd ~/lerobot && uv run python ~/so101-bimanual-teleop/depth_to_state_feature.py \
+     --src_repo_id local/my_task_no_depth \
+     --depth_repo_id local/my_task \
+     --out_repo_id local/my_task_depth_state
+   ```
+
 ## Troubleshooting
 
 - **`Failed to open OpenCVCamera(4)` / `Could not connect on port '...'`:** almost
