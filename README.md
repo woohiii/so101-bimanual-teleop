@@ -9,6 +9,9 @@ this repo is just the glue: launcher scripts, config, and this runbook.
 
 - [2026-09-04](docs/2026-09-04-session-summary.html) — gripper recalibration, bimanual
   bring-up, half-fold data recording, and the SmolVLA depth-to-state training pipeline.
+  GitHub's file viewer shows this as raw source, not the rendered diagram — either
+  clone and open it locally, or view the rendered version at
+  [claude.ai/code/artifact/4abff86c-9304-4247-a967-d22f82fbcfeb](https://claude.ai/code/artifact/4abff86c-9304-4247-a967-d22f82fbcfeb).
 
 ## Hardware
 
