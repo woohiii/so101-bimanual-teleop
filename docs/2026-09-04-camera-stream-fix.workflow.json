@@ -1,0 +1,58 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "Isolating a Flaky Camera Stream Without Breaking Recording",
+    "output": "docs/2026-09-04-camera-stream-fix.html",
+    "quality_profile": "showcase"
+  },
+  "lanes": [
+    { "id": "preview", "label": "Camera Preview (camera_preview.py)" },
+    { "id": "recovery", "label": "Stabilize Depth" },
+    { "id": "failures", "label": "Failures Hit Along the Way", "variant": "exception" }
+  ],
+  "phases": [
+    { "id": "first_try", "label": "First Attempt (Fails)", "fromCol": 0, "toCol": 1 },
+    { "id": "second_try", "label": "Isolate + Re-attempt", "fromCol": 2, "toCol": 4, "variant": "emphasis" },
+    { "id": "ship_phase", "label": "Ship", "fromCol": 5, "toCol": 5, "variant": "dashed" }
+  ],
+  "mainPath": ["goal", "sync_attempt", "revert_verify", "thread_isolate", "qvga_fix", "ship"],
+  "nodes": [
+    { "id": "goal", "lane": "preview", "col": 0, "type": "frontend", "label": "Add RGB Window + Grasp Overlay", "sublabel": "two-dot towel grip guide", "tag": "camera_preview.py", "width": 208 },
+    { "id": "sync_attempt", "lane": "preview", "col": 1, "type": "backend", "label": "Read Color Inline With Depth", "sublabel": "same loop, after depth read", "tag": "color.read_frame()", "width": 194 },
+    { "id": "wedge_fail", "lane": "failures", "col": 1, "type": "security", "label": "Color Read Wedges the Loop", "sublabel": "depth publish freezes too", "tag": "watchdog usbreset", "width": 200 },
+    { "id": "revert_verify", "lane": "recovery", "col": 2, "type": "backend", "label": "Revert + Verify Depth Stable", "sublabel": "depth stable 60s+, 0 resets", "tag": "git checkout", "width": 194 },
+    { "id": "thread_isolate", "lane": "preview", "col": 3, "type": "backend", "label": "Isolate Color in Own Thread", "sublabel": "own frame cache behind a lock", "tag": "threading.Thread + Lock", "width": 204 },
+    { "id": "stall_fail", "lane": "failures", "col": 3, "type": "security", "label": "RGB Still Stalls 25s+", "sublabel": "depth unaffected", "tag": "VGA 640x480", "width": 160 },
+    { "id": "qvga_fix", "lane": "preview", "col": 4, "type": "backend", "label": "Drop Color to QVGA", "sublabel": "max gap 0.34s over 60s", "tag": "320x240", "width": 156 },
+    { "id": "ship", "lane": "preview", "col": 5, "type": "external", "label": "2x2 Grid UI + Ship", "sublabel": "NO SIGNAL placeholders", "tag": "git push x2 repos", "width": 164 }
+  ],
+  "edges": [
+    { "from": "goal", "to": "sync_attempt" },
+    { "from": "sync_attempt", "to": "wedge_fail", "label": "wedges", "variant": "security", "role": "error" },
+    { "from": "wedge_fail", "to": "revert_verify", "label": "recover", "variant": "dashed", "role": "branch" },
+    { "from": "sync_attempt", "to": "revert_verify" },
+    { "from": "revert_verify", "to": "thread_isolate" },
+    { "from": "thread_isolate", "to": "stall_fail", "label": "stalls", "variant": "security", "role": "error" },
+    { "from": "stall_fail", "to": "qvga_fix", "label": "diagnose via cadence test", "variant": "dashed", "role": "branch" },
+    { "from": "thread_isolate", "to": "qvga_fix" },
+    { "from": "qvga_fix", "to": "ship" }
+  ],
+  "cards": [
+    { "dot": "emerald", "title": "Depth Never Went Down", "items": [
+      "Depth is the protected resource — it feeds real robot training datasets",
+      "After the revert, depth held 0.0-0.01s freshness for 60s+ with zero watchdog restarts",
+      "Even during the 25s+ RGB stall, depth stayed completely untouched — proof isolation worked"
+    ] },
+    { "dot": "amber", "title": "Same Failure Shape, Twice", "items": [
+      "This Astra S unit is known-flaky on its color stream",
+      "1st time: shared loop — a color hang froze depth too, and the watchdog USB-reset the device mid-session",
+      "2nd time: isolated thread — the same kind of hang stayed contained to just the RGB preview"
+    ] },
+    { "dot": "cyan", "title": "Fix Was Isolation, Not a Guess", "items": [
+      "Moved all color-stream device I/O into its own thread with its own cache behind a lock",
+      "Deliberately skipped depth-to-color registration — not worth altering recorded depth values for a preview overlay",
+      "Root cause of the remaining stall was resolution, not concurrency: QVGA matched depth and fixed it"
+    ] }
+  ]
+}
