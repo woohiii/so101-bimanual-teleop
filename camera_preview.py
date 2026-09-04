@@ -1,5 +1,6 @@
 #!/usr/bin/env python
-"""3-window live camera preview: Astra S depth camera (depth mode) + 2 USB wrist cameras.
+"""4-window live camera preview: Astra S depth + Astra S RGB (with two-arm
+towel grasp point guidance overlaid) + 2 USB wrist cameras.
 
 IMPORTANT - run with the OTHER venv, NOT the lerobot uv venv:
     ~/lerobot_song_venv/bin/python camera_preview.py
@@ -23,9 +24,10 @@ rather than the plain script:
 repo, not here - not duplicated into this repo because of the large vendored
 SDK binary tree it depends on. See this repo's README.)
 
-That publishes the depth array to /tmp/vsp_astra_depth_mm.npy; this script
-just reads that file instead of opening the Astra S device itself. Only ONE
-process may hold the Astra S device open at a time - close any other running
+That publishes the depth array to /tmp/vsp_astra_depth_mm.npy and (as of
+2026-09-04) the RGB frame to /tmp/vsp_astra_rgb.png; this script just reads
+those files instead of opening the Astra S device itself. Only ONE process
+may hold the Astra S device open at a time - close any other running
 astra_s_*.py script before starting the watchdog.
 """
 
@@ -38,7 +40,8 @@ from pathlib import Path
 import cv2
 import numpy as np
 
-from camera_utils import ASTRA_DEPTH_MM_PATH, PublishedDepthSource, find_camera_index
+from camera_utils import ASTRA_DEPTH_MM_PATH, ASTRA_RGB_FRAME_PATH, PublishedDepthSource, PublishedFrameSource, find_camera_index
+from towel_grasp import detect_towel_grasp_points, draw_grasp_points
 
 CAMERAS_JSON = Path(__file__).parent / "cameras.json"
 
@@ -83,6 +86,12 @@ def self_test():
             f"start run_astra_depth_watchdog.sh first (see this script's docstring), not a failure by itself"
         )
 
+    rgb_source = PublishedFrameSource(ASTRA_RGB_FRAME_PATH)
+    if rgb_source.read()[0]:
+        print(f"PASS: astra_s_depth_hub.py is publishing fresh RGB frames to {ASTRA_RGB_FRAME_PATH}")
+    else:
+        print(f"INFO: no fresh RGB frame at {ASTRA_RGB_FRAME_PATH} yet - same watchdog, not a failure by itself")
+
     ok = True
     for name, passed in checks:
         print(f"{'PASS' if passed else 'FAIL'}: {name}")
@@ -116,14 +125,36 @@ def open_wrist(name, label):
 def run_preview(cameras):
     wrist1 = wrist2 = None
     depth_source = PublishedDepthSource(ASTRA_DEPTH_MM_PATH)
+    rgb_source = PublishedFrameSource(ASTRA_RGB_FRAME_PATH)
     try:
         wrist1 = open_wrist(cameras["wrist_1_name"], "Wrist 1")
         wrist2 = open_wrist(cameras["wrist_2_name"], "Wrist 2")
 
         while True:
             depth_mm = depth_source.read()
-            if depth_mm is not None:
-                cv2.imshow("Astra S Depth", depth_to_display(depth_mm))
+            depth_vis = depth_to_display(depth_mm) if depth_mm is not None else None
+
+            ok, rgb = rgb_source.read()
+            grasp_points = detect_towel_grasp_points(rgb) if ok else None
+            if ok:
+                cv2.imshow("Astra S RGB (grasp points)", draw_grasp_points(rgb, grasp_points))
+
+            if grasp_points is not None and depth_vis is not None:
+                # ponytail: scales RGB-frame points onto depth's QVGA grid by
+                # resolution ratio only (color VGA / depth QVGA, both after
+                # depth-to-color registration) - not a per-pixel calibration,
+                # good enough for a visual guide, upgrade if this rig's two
+                # streams turn out to not share a FOV cleanly.
+                sx, sy = depth_vis.shape[1] / rgb.shape[1], depth_vis.shape[0] / rgb.shape[0]
+
+                def _scale(p):
+                    return (int(p[0] * sx), int(p[1] * sy))
+
+                scaled = type(grasp_points)(left=_scale(grasp_points.left), right=_scale(grasp_points.right))
+                depth_vis = draw_grasp_points(depth_vis, scaled)
+
+            if depth_vis is not None:
+                cv2.imshow("Astra S Depth", depth_vis)
 
             if wrist1 is not None:
                 ok, img = wrist1.read()

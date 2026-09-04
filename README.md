@@ -5,6 +5,11 @@ Bimanual (2 leader + 2 follower) SO-101 teleoperation with a live depth camera v
 [LeRobot](https://github.com/huggingface/lerobot) — no core LeRobot code was changed,
 this repo is just the glue: launcher scripts, config, and this runbook.
 
+## Session notes
+
+- [2026-09-04](docs/2026-09-04-session-summary.html) — gripper recalibration, bimanual
+  bring-up, half-fold data recording, and the SmolVLA depth-to-state training pipeline.
+
 ## Hardware
 
 - 2x SO-101 leader arm, 2x SO-101 follower arm, all pre-calibrated, ids

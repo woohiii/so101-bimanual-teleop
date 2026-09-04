@@ -1,0 +1,235 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "SO-101 Gripper Swap to SmolVLA Training",
+    "output": "outputs/archify/so101_session.html",
+    "quality_profile": "showcase"
+  },
+  "lanes": [
+    {
+      "id": "hardware",
+      "label": "Hardware Bring-up"
+    },
+    {
+      "id": "capture",
+      "label": "Data Capture"
+    },
+    {
+      "id": "training",
+      "label": "Model Training"
+    },
+    {
+      "id": "issues",
+      "label": "Snags + Fixes",
+      "variant": "exception"
+    }
+  ],
+  "phases": [
+    {
+      "id": "verify_phase",
+      "label": "Verify hardware",
+      "fromCol": 0,
+      "toCol": 2
+    },
+    {
+      "id": "capture_phase",
+      "label": "Collect + prep data",
+      "fromCol": 3,
+      "toCol": 4,
+      "variant": "emphasis"
+    },
+    {
+      "id": "train_phase",
+      "label": "Train",
+      "fromCol": 5,
+      "toCol": 5,
+      "variant": "dashed"
+    }
+  ],
+  "mainPath": [
+    "bring_up",
+    "recalibrate",
+    "verify",
+    "record",
+    "prep_dataset",
+    "train"
+  ],
+  "nodes": [
+    {
+      "id": "bring_up",
+      "lane": "hardware",
+      "col": 0,
+      "type": "external",
+      "label": "Re-find USB Ports",
+      "sublabel": "2->4 arms, ports shuffled",
+      "tag": "lerobot-find-port",
+      "width": 168
+    },
+    {
+      "id": "recalibrate",
+      "lane": "hardware",
+      "col": 1,
+      "type": "external",
+      "label": "Recalibrate Gripper",
+      "sublabel": "follower_left, new gripper",
+      "tag": "calibrate_arms.py",
+      "width": 168
+    },
+    {
+      "id": "verify",
+      "lane": "hardware",
+      "col": 2,
+      "type": "external",
+      "label": "Verify Bimanual Teleop",
+      "sublabel": "2 wrist cams + Astra depth",
+      "tag": "rerun",
+      "width": 168
+    },
+    {
+      "id": "record",
+      "lane": "capture",
+      "col": 3,
+      "type": "backend",
+      "label": "Record Dataset",
+      "sublabel": "20 eps, half-fold, bimanual",
+      "tag": "lerobot-record",
+      "width": 168
+    },
+    {
+      "id": "prep_dataset",
+      "lane": "capture",
+      "col": 4,
+      "type": "backend",
+      "label": "Depth to State Feature",
+      "sublabel": "240x320 -> 4x4 grid",
+      "tag": "dataset_tools.py",
+      "width": 168
+    },
+    {
+      "id": "train",
+      "lane": "training",
+      "col": 5,
+      "type": "backend",
+      "label": "Train SmolVLA",
+      "sublabel": "50k steps, batch 4, 8GB GPU",
+      "tag": "lerobot-train",
+      "width": 168
+    },
+    {
+      "id": "cable_fault",
+      "lane": "issues",
+      "col": 1,
+      "type": "security",
+      "label": "Loose Daisy-Chain Cable",
+      "sublabel": "wrist_roll: no status packet",
+      "width": 168
+    },
+    {
+      "id": "camera_bandwidth",
+      "lane": "issues",
+      "col": 2,
+      "type": "security",
+      "label": "USB Bandwidth Limit",
+      "sublabel": "3rd camera: not enough bandwidth",
+      "width": 168
+    },
+    {
+      "id": "rerun_backpressure",
+      "lane": "issues",
+      "col": 3,
+      "type": "security",
+      "label": "Rerun Backpressure",
+      "sublabel": "fix: compress wrist images",
+      "width": 168
+    },
+    {
+      "id": "vision_channel_crash",
+      "lane": "issues",
+      "col": 4,
+      "type": "security",
+      "label": "Vision Encoder Crash",
+      "sublabel": "RGB-only, depth is 1 channel",
+      "width": 168
+    }
+  ],
+  "edges": [
+    {
+      "from": "bring_up",
+      "to": "recalibrate"
+    },
+    {
+      "from": "recalibrate",
+      "to": "verify"
+    },
+    {
+      "from": "verify",
+      "to": "record"
+    },
+    {
+      "from": "record",
+      "to": "prep_dataset"
+    },
+    {
+      "from": "prep_dataset",
+      "to": "train"
+    },
+    {
+      "from": "recalibrate",
+      "to": "cable_fault",
+      "label": "connect() fails",
+      "variant": "security",
+      "role": "error"
+    },
+    {
+      "from": "verify",
+      "to": "camera_bandwidth",
+      "label": "add 3rd camera",
+      "variant": "security",
+      "role": "error"
+    },
+    {
+      "from": "record",
+      "to": "rerun_backpressure",
+      "label": "wrist stream",
+      "variant": "security",
+      "role": "error"
+    },
+    {
+      "from": "record",
+      "to": "vision_channel_crash",
+      "label": "raw depth feature",
+      "variant": "security",
+      "role": "error"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "emerald",
+      "title": "What Worked",
+      "items": [
+        "New gripper recalibrated and verified tracking the leader live",
+        "20-episode bimanual dataset recorded (2 wrist cams + Astra depth)",
+        "SmolVLA training launched on a depth-aware state vector"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "Hardware Snags",
+      "items": [
+        "Gripper swap loosened a daisy-chain cable (wrist_roll/wrist_flex)",
+        "This rig's USB 2.0 bus can't carry 3 simultaneous camera streams",
+        "USB re-enumeration meant re-checking ports at every stage"
+      ]
+    },
+    {
+      "dot": "cyan",
+      "title": "Key Decision",
+      "items": [
+        "SmolVLA's vision encoder is RGB-only - can't take a depth image",
+        "Downsampled depth to 16 values and folded it into observation.state",
+        "Kept the original depth-video dataset around unmodified for later"
+      ]
+    }
+  ]
+}
